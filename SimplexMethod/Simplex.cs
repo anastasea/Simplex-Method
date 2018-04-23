@@ -17,13 +17,12 @@ namespace SimplexMethod
         // 0 столбец - свободные члены
         // Базис хранится отдельно
         public int[] Basis { get; set; }
-        public List<int> SlackVarInd { get; set; }
-        public List<int> SurplusVarInd { get; set; }
-        public List<int> ArtificialVarInd { get; set; }
         private int varInd;
         private int costMRow;
         private int costRow;
         private const double M = double.PositiveInfinity;
+
+        private Dictionary<int, int> additionalVars;
 
         public Simplex(LinearProgrammingProblem prob)
         {
@@ -34,6 +33,7 @@ namespace SimplexMethod
             costMRow = SimplexTable.GetLength(0) - 1;
             costRow = costMRow - 1;
             Basis = new int[Prob.CountConstraint];
+            additionalVars = new Dictionary<int, int>();
             for (int i = 0; i < Prob.CountConstraint + 1; i++)
             {
                 for (int j = 0; j < Prob.CountVariables + 1; j++)
@@ -80,7 +80,7 @@ namespace SimplexMethod
             }
             if(Prob.NotNonNegativeVarInd != null)
             {
-                count++;
+                count += Prob.NotNonNegativeVarInd.Length;
             }
             return count;
         }
@@ -108,7 +108,7 @@ namespace SimplexMethod
         {
             for (int i = 0; i < Prob.CountConstraint; i++)
             {
-                if (Prob.Constants[i] <= 0)
+                if (Prob.Constants[i] < 0)
                 {
                     for(int j = 0; j < SimplexTable.GetLength(1); j++)
                     {
@@ -122,36 +122,25 @@ namespace SimplexMethod
         {
             if (Prob.NotNonNegativeVarInd != null)
             {
-                double coeffCrit = 0;
-                double coeffConstr = 0;
-                for (int i = 0; i < Prob.CountConstraint + 1; i++)
+                foreach (int ind in Prob.NotNonNegativeVarInd)
                 {
-                    foreach (int ind in Prob.NotNonNegativeVarInd)
+                    for (int i = 0; i < Prob.CountConstraint + 1; i++)
                     {
-                        if (i == 0)
-                        {
-                            coeffCrit -= SimplexTable[0, ind + 1];
-                        }
-                        coeffConstr -= SimplexTable[i, ind + 1];
+                        SimplexTable[i, varInd] = SimplexTable[i, ind + 1] * (-1);
                     }
-                    SimplexTable[i, varInd] = coeffConstr;
-                    coeffConstr = 0;
+                    additionalVars.Add(ind, varInd-1);
+                    varInd++;
                 }
-                SimplexTable[0, varInd] = coeffCrit;
-                varInd++;
             }
         }
                 
         public void AddSlackAndSurplusVariables()
         {
-            SlackVarInd = new List<int>();
-            SurplusVarInd = new List<int>();
             for (int i = 0; i < Prob.CountConstraint; i++)
             {
                 if ((Prob.ConstraintSigns[i] == MathSign.LessThan && Prob.Constants[i] >= 0) ||
                     (Prob.ConstraintSigns[i] == MathSign.GreaterThan && Prob.Constants[i] < 0))
                 {
-                    SlackVarInd.Add(varInd);
                     SimplexTable[i + 1, varInd] = 1;
                     Basis[i] = varInd;
                     varInd++;
@@ -159,7 +148,6 @@ namespace SimplexMethod
                 else if ((Prob.ConstraintSigns[i] == MathSign.GreaterThan && Prob.Constants[i] >= 0) ||
                     (Prob.ConstraintSigns[i] == MathSign.LessThan && Prob.Constants[i] < 0))
                 {
-                    SurplusVarInd.Add(varInd);
                     SimplexTable[i + 1, varInd] = -1;
                     varInd++;
                 }
@@ -168,14 +156,12 @@ namespace SimplexMethod
 
         public void AddArtificialVariables()
         {
-            ArtificialVarInd = new List<int>();
             for (int i = 0; i < Prob.CountConstraint; i++)
             {
                 if ((Prob.ConstraintSigns[i] == MathSign.GreaterThan && Prob.Constants[i] >= 0) ||
                     (Prob.ConstraintSigns[i] == MathSign.LessThan && Prob.Constants[i] < 0) ||
                     Prob.ConstraintSigns[i] == MathSign.Equal)
                 {
-                    ArtificialVarInd.Add(varInd);
                     SimplexTable[i + 1, varInd] = 1;
                     SimplexTable[0, varInd] = -M;
                     Basis[i] = varInd;
@@ -241,18 +227,29 @@ namespace SimplexMethod
                 Console.WriteLine("PIV COL: " + pivotColumn);
                 if (pivotColumn == -1)
                 {
-                    // Проверка на равентсво нулю исскуственной переменной: если нет, то нет оптимального решения
                     if (SimplexTable[SimplexTable.GetLength(0) - 1, 0] != 0)
                     {
                         return null;
                     }
                     else
                     {
-                        double[] optSolution = new double[SimplexTable.GetLength(1)-1];
-                        foreach(int i in Basis)
+                        double[] solution = new double[SimplexTable.GetLength(1) - 1];
+                        double[] optSolution = new double[Prob.CountVariables];
+                        for (int i = 0; i < Basis.Length; i++)
                         {
-                            optSolution[i - 1] = SimplexTable[i, 0];
+                            if (Basis[i] - 1 < Prob.CountVariables)
+                            {
+                                solution[Basis[i] - 1] = SimplexTable[i + 1, 0];
+                            }
                         }
+                        if (additionalVars.Count != 0)
+                        {
+                            foreach(KeyValuePair<int, int> pair in additionalVars) 
+                            {
+                                solution[pair.Key] -= solution[pair.Value];
+                            }
+                        }
+                        Array.Copy(solution, optSolution, optSolution.Length);
                         double optObjectiveValue = SimplexTable[SimplexTable.GetLength(0) - 2, 0];
                         Console.WriteLine("OPT SOL:");
                         foreach(double v in optSolution)
@@ -311,8 +308,7 @@ namespace SimplexMethod
                 }
             }
         }
-
-        // rewrite later
+        
         private int FindPivotColumn()
         {
             List<int> minInd = new List<int>();
