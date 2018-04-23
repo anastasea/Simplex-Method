@@ -237,7 +237,6 @@ namespace SimplexMethod
             }
             while (true)
             {
-                FindCosts();
                 int pivotColumn = FindPivotColumn();
                 Console.WriteLine("PIV COL: " + pivotColumn);
                 if (pivotColumn == -1)
@@ -281,26 +280,30 @@ namespace SimplexMethod
                         Console.Write(i + " ");
                     }
                     Console.WriteLine();
-                    for (int i = 1; i < SimplexTable.GetLength(0); i++)
-                    {
-                        if (i == pivotRow)
-                            continue;
-                        for (int j = 0; j < SimplexTable.GetLength(1); j++)
-                        {
-                            SimplexTable[i, j] = SimplexTable[i, j] - (SimplexTable[i, pivotColumn] * SimplexTable[pivotRow, j])/ SimplexTable[pivotRow, pivotColumn];
-                        }
-                    }
+                    double[,] oldTable = new double[SimplexTable.GetLength(0), SimplexTable.GetLength(1)]; 
+                    Array.Copy(SimplexTable, oldTable, SimplexTable.Length);
+                    double pivotElem = SimplexTable[pivotRow, pivotColumn];
                     for (int j = 0; j < SimplexTable.GetLength(1); j++)
                     {
-                        SimplexTable[pivotRow, j] = SimplexTable[pivotRow, j] / SimplexTable[pivotRow, pivotColumn];
+                        SimplexTable[pivotRow, j] = oldTable[pivotRow, j] / pivotElem;
                     }
+                    for (int i = 1; i < SimplexTable.GetLength(0); i++)
+                    {
+                        if (i == pivotRow || oldTable[i, pivotColumn] == 0)
+                            continue;
+                        for (int j = 0; j < SimplexTable.GetLength(1)-2; j++)
+                        {
+                            SimplexTable[i, j] = oldTable[i, j] - (oldTable[i, pivotColumn] * SimplexTable[pivotRow,j]);
+                        }
+                    }
+                    FindCosts();
                     Console.WriteLine();
                     Console.WriteLine("NEW TABLE");
                     for (int i = 0; i < SimplexTable.GetLength(0); i++)
                     {
                         for (int j = 0; j < SimplexTable.GetLength(1); j++)
                         {
-                            Console.Write(SimplexTable[i, j] + "   ");
+                            Console.Write(String.Format("{0:0.##}",SimplexTable[i, j]) + "        ");
                         }
                         Console.WriteLine();
                     }
@@ -344,6 +347,7 @@ namespace SimplexMethod
                         pivotCol = j;
                     }
                 }
+                Console.WriteLine("pivcol " + pivotCol+" " + SimplexTable[costRow, pivotCol]);
                 Console.WriteLine();
                 Console.WriteLine("min " + min + " minM " + minM);
                 if(min >= 0 && minM >=0)
