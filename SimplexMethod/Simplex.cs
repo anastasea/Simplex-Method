@@ -170,7 +170,7 @@ namespace SimplexMethod
             }
         }
 
-        private void FindCosts()
+        private void FindInitialCosts()
         {
             int costMRow = SimplexTable.GetLength(0) - 1;
             int costRow = costMRow - 1;
@@ -200,6 +200,26 @@ namespace SimplexMethod
             }
         }
 
+        private void FindNewSimplexTable(int pivotRow, int pivotColumn)
+        {
+            double[,] oldTable = new double[SimplexTable.GetLength(0), SimplexTable.GetLength(1)];
+            Array.Copy(SimplexTable, oldTable, SimplexTable.Length);
+            double pivotElem = SimplexTable[pivotRow, pivotColumn];
+            for (int j = 0; j < SimplexTable.GetLength(1); j++)
+            {
+                SimplexTable[pivotRow, j] = oldTable[pivotRow, j] / pivotElem;
+            }
+            for (int i = 1; i < SimplexTable.GetLength(0); i++)
+            {
+                if (i == pivotRow || oldTable[i, pivotColumn] == 0)
+                    continue;
+                for (int j = 0; j < SimplexTable.GetLength(1); j++)
+                {
+                    SimplexTable[i, j] = oldTable[i, j] - (oldTable[i, pivotColumn] * SimplexTable[pivotRow, j]);
+                }
+            }
+        }
+
         public Tuple<double, double[]> Calculate()
         {
             ConvertToStandardForm();
@@ -210,7 +230,7 @@ namespace SimplexMethod
             {
                 Console.Write(i + " ");
             }
-            FindCosts();
+            FindInitialCosts();
             Console.WriteLine();
             Console.WriteLine("INIT TABLE");
             for (int i = 0; i < SimplexTable.GetLength(0); i++)
@@ -251,6 +271,10 @@ namespace SimplexMethod
                         }
                         Array.Copy(solution, optSolution, optSolution.Length);
                         double optObjectiveValue = SimplexTable[SimplexTable.GetLength(0) - 2, 0];
+                        if(Prob.Maximize == false)
+                        {
+                            optObjectiveValue *= -1;
+                        }
                         Console.WriteLine("OPT SOL:");
                         foreach(double v in optSolution)
                         {
@@ -277,23 +301,7 @@ namespace SimplexMethod
                         Console.Write(i + " ");
                     }
                     Console.WriteLine();
-                    double[,] oldTable = new double[SimplexTable.GetLength(0), SimplexTable.GetLength(1)]; 
-                    Array.Copy(SimplexTable, oldTable, SimplexTable.Length);
-                    double pivotElem = SimplexTable[pivotRow, pivotColumn];
-                    for (int j = 0; j < SimplexTable.GetLength(1); j++)
-                    {
-                        SimplexTable[pivotRow, j] = oldTable[pivotRow, j] / pivotElem;
-                    }
-                    for (int i = 1; i < SimplexTable.GetLength(0); i++)
-                    {
-                        if (i == pivotRow || oldTable[i, pivotColumn] == 0)
-                            continue;
-                        for (int j = 0; j < SimplexTable.GetLength(1)-2; j++)
-                        {
-                            SimplexTable[i, j] = oldTable[i, j] - (oldTable[i, pivotColumn] * SimplexTable[pivotRow,j]);
-                        }
-                    }
-                    FindCosts();
+                    FindNewSimplexTable(pivotRow, pivotColumn);
                     Console.WriteLine();
                     Console.WriteLine("NEW TABLE");
                     for (int i = 0; i < SimplexTable.GetLength(0); i++)
